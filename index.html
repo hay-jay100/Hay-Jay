@@ -113,5 +113,26 @@
       nameInput.value = '';
     });
   </script>
+  // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBDkTk04Ue2ZFBixYUa84GMAP-00LWtJMU",
+  authDomain: "aj-anony-mouz.firebaseapp.com",
+  projectId: "aj-anony-mouz",
+  storageBucket: "aj-anony-mouz.firebasestorage.app",
+  messagingSenderId: "33783196290",
+  appId: "1:33783196290:web:59e2ed55e2efcf713e229b",
+  measurementId: "G-DEH8T5TMD7"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 </body>
 </html>
