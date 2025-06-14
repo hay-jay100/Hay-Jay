@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hay Jay FPS - CODM Lite</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: sans-serif; background: black; }
+    canvas { display: block; }
+    #ui {
+      position: absolute;
+      top: 10px; left: 10px;
+      color: white; font-size: 16px;
+      z-index: 999;
+    }
+    #crosshair {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 8px; height: 8px;
+      background: white;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+    }
+    #start-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px 40px;
+      font-size: 24px;
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      cursor: pointer;
+      z-index: 999;
+    }
+    #game-over {
+      display: none;
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translateX(-50%);
+      color: red;
+      font-size: 32px;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+  <button id="start-btn">START GAME</button>
+  <div id="crosshair"></div>
+  <div id="ui">
+    <div>Health: <span id="health">100</span></div>
+    <div>Ammo: <span id="ammo">10</span>/10</div>
+    <div>Score: <span id="score">0</span></div>
+  </div>
+  <div id="game-over">GAME OVER</div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/controls/PointerLockControls.js"></script>
+  <script>
+    let scene = new THREE.Scene();
+    let camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    let renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.PointerLockControls(camera, document.body);
+    const startBtn = document.getElementById('start-btn');
+    startBtn.addEventListener('click', () => {
+      controls.lock();
+      startBtn.style.display = 'none';
+      bgm.play();
+    });
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambientLight);
+
+const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 10, 7.5);
+    light.castShadow = true;
+scene.add(light);
+
+    const floorGeo = new THREE.PlaneGeometry(100, 100);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    let move = { forward: false, backward: false, left: false, right: false };
+    const velocity = new THREE.Vector3();
+    document.addEventListener('keydown', e => {
+      if (e.code in move) move[e.code.split('Key')[1].toLowerCase()] = true;
+    });
+    document.addEventListener('keyup', e => {
+      if (e.code in move) move[e.code.split('Key')[1].toLowerCase()] = false;
+    });
+
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+    gun.position.set(0.3, -0.2, -0.5);
+    camera.add(gun);
+    scene.add(camera);
+
+    let bullets = [], bulletSpeed = 2, ammo = 10, score = 0;
+    const enemies = [], ENEMY_SPEED = 0.01;
+    let health = 100;
+    const healthUI = document.getElementById('health');
+    const ammoUI = document.getElementById('ammo');
+    const scoreUI = document.getElementById('score');
+    const gameOver = document.getElementById('game-over');
+
+    function shoot() {
+      if (ammo <= 0) {
+        reloadSound.play();
+        return;
+      }
+      ammo--; ammoUI.textContent = ammo;
+      const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.05), new THREE.MeshStandardMaterial({ color: 0xffff00 }));
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      bullet.position.copy(camera.position);
+      bullet.userData = { velocity: dir.multiplyScalar(bulletSpeed) };
+      scene.add(bullet);
+      bullets.push(bullet);
+      gunshotSound.play();
+    }
+
+    window.addEventListener('click', shoot);
+
+    function spawnEnemy() {
+      const enemy = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000 }));
+      enemy.position.set((Math.random() - 0.5) * 50, 0.5, -50);
+      enemy.userData = { health: 3 };
+      scene.add(enemy);
+      enemies.push(enemy);
+    }
+
+    for (let i = 0; i < 5; i++) spawnEnemy();
+
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      velocity.set(0, 0, 0);
+      if (move.forward) velocity.z -= 10 * delta;
+      if (move.backward) velocity.z += 10 * delta;
+      if (move.left) velocity.x -= 10 * delta;
+      if (move.right) velocity.x += 10 * delta;
+      controls.moveRight(velocity.x);
+      controls.moveForward(velocity.z);
+
+      bullets.forEach((b, i) => {
+        b.position.add(b.userData.velocity);
+        enemies.forEach((e, j) => {
+          if (b.position.distanceTo(e.position) < 1) {
+            scene.remove(b); bullets.splice(i, 1);
+            e.userData.health--;
+            if (e.userData.health <= 0) {
+              deathSound.play();
+              scene.remove(e); enemies.splice(j, 1);
+              score += 10; scoreUI.textContent = score;
+              spawnEnemy();
+            }
+          }
+        });
+      });
+
+      enemies.forEach(e => {
+        const dir = new THREE.Vector3().subVectors(camera.position, e.position).normalize();
+        e.position.add(dir.multiplyScalar(ENEMY_SPEED));
+        if (e.position.distanceTo(camera.position) < 2) {
+          health -= 0.5; healthUI.textContent = Math.floor(health);
+          if (health <= 0) {
+            gameOver.style.display = 'block';
+            bgm.pause();
+          }
+        }
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Sounds
+    const gunshotSound = new Audio('https://actions.google.com/sounds/v1/impacts/metal_thud_and_single_shot.ogg');
+    const reloadSound = new Audio('https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg');
+    const deathSound = new Audio('https://actions.google.com/sounds/v1/human_voices/man_screaming.ogg');
+    const bgm = new Audio('https://cdn.pixabay.com/audio/2022/12/05/audio_287f249c45.mp3');
+    bgm.loop = true;
+    bgm.volume = 0.4;
+  </script>
+</body>
+</html>
